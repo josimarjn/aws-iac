@@ -1,0 +1,55 @@
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  lambdaestudos:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Sub
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: lambdaestudos
+      CodeUri: src/Function
+      Handler: handler.handler
+      Runtime: python3.12
+      MemorySize: 128
+      Timeout: 10
+      Tracing: Active
+      Events:
+        estudos:
+          Type: S3
+          Properties:
+            Bucket: !Ref estudos
+            Events:
+              - s3:ObjectCreated:*
+  lambdaestudosLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${lambdaestudos}
+  estudos:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-estudos-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: alias/aws/s3
+      PublicAccessBlockConfiguration:
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  estudosBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref estudos
+      PolicyDocument:
+        Id: RequireEncryptionInTransit
+        Version: '2012-10-17'
+        Statement:
+          - Principal: '*'
+            Action: '*'
+            Effect: Deny
+            Resource:
+              - !GetAtt estudos.Arn
+              - !Sub ${estudos.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
